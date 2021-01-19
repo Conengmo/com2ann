@@ -570,23 +570,30 @@ def wrap_function_header(header: str) -> List[str]:
     parts: List[str] = []
     next_part = ''
     nested = 0
+    parenthesis_open = False
     complete = False  # Did we split all the arguments inside (...)?
-    indent: Optional[int] = None
+    indent: int = len(header) - len(header.lstrip(' '))
 
     for i, c in enumerate(header):
         if c in '([{':
             nested += 1
-            if c == '(' and indent is None:
-                indent = i + 1
         if c in ')]}':
             nested -= 1
             if not nested:
+                if not complete:
+                    if not next_part.endswith(','):
+                        next_part += ','
+                    parts.append(next_part)
+                    next_part = ''
                 # To avoid splitting return types that also have commas.
                 complete = True
-        if c == ',' and nested == 1 and not complete:
+        if c == '(' and parenthesis_open is False:
+            parenthesis_open = True
+        if ((parenthesis_open is True or c == ',') and nested == 1) and not complete:
             next_part += c
             parts.append(next_part)
             next_part = ''
+            parenthesis_open = None
         else:
             next_part += c
 
@@ -597,7 +604,7 @@ def wrap_function_header(header: str) -> List[str]:
 
     # Indent all the wrapped lines.
     assert indent is not None
-    parts = [parts[0]] + [' ' * indent + p.lstrip(' \t') for p in parts[1:]]
+    parts = [parts[0]] + [' ' * (indent + 8) + p.lstrip(' ') for p in parts[1:-1]] + [' ' * indent + parts[-1]]
 
     # Add line endings like in the original header.
     trailer = re.search(_TRAILER, header)
